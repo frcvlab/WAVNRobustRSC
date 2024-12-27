@@ -162,7 +162,7 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
                 etime1 = tm.perf_counter()-stime1
                 if rsppath1 is None:
                     continue
-                #'''
+                #
                 stime2=tm.perf_counter()
                 rsppath2 = wavn.refinePathVH(rsppath1,options=wavn.gRobustPathEnabled,NS=25,NR=10)
                 etime2 = tm.perf_counter()-stime2
@@ -181,9 +181,9 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
                 rspt2 += etime1+etime2 # total time
                 bfst1 += etime3
                 rspl1 += len(rsppath1) # wv.pathLength(rsppath1,landmarks)
-                rspl2 +=  len(rsppath2) #wv.pathLength(rsppath2,landmarks) #plen[mili]#
-                bfsl1 +=  len(bfspath) #wv.pathLength(bfspath,landmarks) #cpathLength(cpath2,wavn.robots,wavn.landmarks)#
-        #end of this scale experiment k*100 runs
+                rspl2 +=  len(rsppath2) #wv.pathLength(rsppath2,landmarks) 
+                bfsl1 +=  len(bfspath) #wv.pathLength(bfspath,landmarks) 
+        #end of this scale experiment k*numReps runs
         print("End of scale=",scale," #P=",numPaths," collecting stats.")
         rsptime1.append( float(rspt1)/float(numPaths) )
         rsptime2.append( float(rspt2)/float(numPaths) )
@@ -239,15 +239,15 @@ def altMain2R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
         wavn.gRobustPathEnabled=True
         wavn.rlRange=rlRange
         for k in range(0,numK):
+            #
             while True:
                 robots, landmarks, walls = wavn.makeWorld(numRobots, numLandmarks, 0)
-                #wavn.initTargets() # init swarm targets
                 common,cansee = wavn.findCommon()
                 wavn.makeGlobalSuccessors()
                 ledger = wavn.makeRLedger()
                 if not ledger is None:
                     break
-            #for i in range(numReps):
+            #
             i=0
             while i<numReps:
                 # Do one experiment
@@ -281,7 +281,7 @@ def altMain2R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
                 rspl1 += len(rsppath1) # wv.pathLength(rsppath1,landmarks)
                 rspl2 += len(rsppath2) #wv.pathLength(rsppath2,landmarks)
                 bfsl1 += len(bfspath) #wv.pathLength(bfspath,landmarks) 
-        #end of this scale experiment k*100 runs
+        #end of this scale experiment k*numReps runs
         print("End of scale=",scale," #P=",numPaths," collecting stats.")
         rsptime1.append( rspt1/numPaths )
         rsptime2.append( rspt2/numPaths )
@@ -355,7 +355,7 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
     #
     # make the list of experiments to perform
     expParamList = []
-    kmax= 5 # 5 for repeat simulations
+    kmax= 5 # for repeat simulations
     rflag=True # robust only
     for tflag in [False,True]: # True is path type BFS and False is RSC
         for scale in range(1,10,1):
@@ -368,7 +368,7 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
                     expParamList.append(exp)
 
     #
-    casename="122624-AllP0-100-S1-9BIG"
+    casename="122624-AllP0-100-S1-9BIGreps30"
     filemode='w'
     if appendFlag:
         filemode='a'
@@ -391,7 +391,6 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
     
         while True:
             robots, landmarks, walls = wavn.makeWorld(numRobots, numLandmarks, 0)
-            #wavn.initTargets() # init swarm targets
             common,cansee = wavn.findCommon()
             wavn.makeGlobalSuccessors()
             ledger = wavn.makeRLedger()
@@ -418,11 +417,11 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
             numBlocked=0 # paths that randomly were blocked
         #
         numGoals=0 # num unique goals
-        maxTimeSteps=50
-        maxGoals=5
+        maxTimeSteps=50 # not used in this version
+        maxGoals=30
         #
   
-        while numGoals<maxGoals: #timeSteps<maxTimeSteps: #numFPPaths < 50: #  attempt to get to goal
+        while numGoals<maxGoals: #  attempt to get to goal
             #
             timeSteps += 1
             #wavn.resetTargets() # anybody need a new goal
@@ -440,7 +439,7 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
                         break
                 continue
             #
-            wavn.gBlocked=None # reverse any blockages from last exp
+            wavn.gBlocked=None # reverse any blockages from last exp, redundant
             #
             # Step 3: FIND A PATH
             numGoals+=1
@@ -466,7 +465,7 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
                 numRedundancy += wv.cpathRedundancy(path)
                 bfssteps=len(path)
                 movesucceeded,howfar=wavn.moveRobot(rs,path,le) # blocks handled within
-                if movesucceeded :#or (not wavn.gRobustPathEnabled): #for speed
+                if movesucceeded :
                     #
                     numMPaths += 1
                     numPsteps += (bfssteps-1) # single steps in the plan

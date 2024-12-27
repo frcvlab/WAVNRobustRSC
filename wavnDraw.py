@@ -1,14 +1,16 @@
 #
-# DRAWING FUNCTIONS
-# for WAVN simulation dml Feb 2024
+# SIMPLE DRAWING FUNCTIONS
+# for WAVN simulation
+# dml Feb 2024
 # 
 #
 import cv2
 
-# turn on/off drawing the map
+# Global for turn on/off drawing the map
 gRender=True
 
-# color codes for various things
+# Global
+# color codes for drawing various things
 #
 robotMark =(100,0,0)
 robotMark1=(150,0,0)
@@ -20,10 +22,12 @@ pathMark2 = (50,120,220)
 pathMark3 = (120,150,50)
 pathMark4 = (150,150,150)
 wallMark = (150,150,0)
+
 #
 #
 #worldsize globals
 worldX,worldY=None,None
+
 #
 # draw a line
 def doLine(s,e,map,mark=lineMark,offset=(0,0)):
@@ -37,7 +41,7 @@ def doLine(s,e,map,mark=lineMark,offset=(0,0)):
         for sp in s:
             doLine(sp,e,map,mark,offset)
         return
-    #print("** ",e, "&&& ",s)     
+    #   
     xdiff = float(e[0]-s[0])
     ydiff = float(e[1]-s[1])
     res=100.0
@@ -84,9 +88,7 @@ def drawPath(path,lmark,map,mark=pathMark1,offset=(0,0)):
     for pi in range(0,len(path)-1):
         l1 = path[pi]
         l2 = path[pi+1]
-        #print("drawpath ",l1,l2)
         doLine( l1,l2,map,mark,offset)
-    #print("--")
     return
 
 # Draw the world: robots, landmarks, walls
@@ -95,7 +97,7 @@ def drawWorld(robots,landmarks,walls, common, cansee, map, clflag=True, rs=-1, r
         return
     map.fill(255) # kill old map
     for r in robots:
-        if clflag :#or (not clflag and robots.index(r)==rs):
+        if clflag :
             for m in cansee[robots.index(r)]:
                 doLine(r,m,map)
     #
@@ -113,12 +115,8 @@ def drawWorld(robots,landmarks,walls, common, cansee, map, clflag=True, rs=-1, r
     for r in robots:
         mark=robotMark
         ri=robots.index(r)
-        #if ri==re:
-        #    mark=robotMark1
-        #    #print("re ",re)
         if ri==rs:
             mark=robotMark2
-            #print("rs ",rs)
         drawRobot(r, map, mark)
     return
 

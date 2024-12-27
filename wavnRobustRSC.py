@@ -1,15 +1,13 @@
 #
 # WAVN world simulation for large teams
+# Implement RSC and RRSC 
+# Evaluating Robust BFS and RSC against non robust forms
 #
 # dml Feb 2024
-# + adding walls and doors to make RSP
-# more dynamic.
-# +This version also has moving robots
-# + Evaluating RObust BFS and RSC against non robust form
+# + adding walls and doors to do
+# more dynamic testing
+# +This version also has moving robots/swarm
 #
-# Dec 2024 Cleaned up a lot of the BFS and RSC code
-# and added a better main for testing
-# Dec 2024 added an RRT implementation
 #
 
 import cv2
@@ -117,24 +115,20 @@ class WAVNSim:
     # goal function for BFS where goal is a landmark gGoalMark
     # call using lambda
     def goalFunc(self,bot):
-        #print("BFS goal?: robot",bot," lmark ",gGoalMark," cansee ",cansee[bot])
         return self.landmarks[self.gGoalMark] in self.cansee[bot],self.gGoalMark
 
 
     # successor function for BFS, uses global gSuccDict
     # call using lambda
     def successorFunc(self,bot,searched):
-        #self.checkCommon(bot)
         if not bot in self.gSuccDict:
-            #print("Succ:",bot,"[]")
             return []
         else:
-            #print("Succ:",bot,self.gSuccDict[bot])
             return self.gSuccDict[bot]
         return []
 
     # envelop function for BFS search
-    # automaically checks robust or not
+    # automatically checks robust or not
     def bfsFindPath(self,rs,re): # rs is start robot and re is goal landmark
         self.gGoalMark=re
         initstate = [rs,None]
@@ -187,11 +181,8 @@ class WAVNSim:
             c = y2-m*x2
             w=(x1,y1,x2,y2,m,c)
             if (not geo.anyonline(w,robots)) and (not geo.anyonline(w,landmarks)):
-                #print("wall added ",w)
                 walls.append(w)
-            #else:
-            #print("wall fails")
-        #print (walls  )
+
         self.robots=robots
         self.landmarks=landmarks
         self.walls=walls
@@ -257,7 +248,7 @@ class WAVNSim:
                     cl.append(l)
             cansee[ri]=cl
             sum += len(cl)
-        #print("Avg visib:",sum/len(robots))
+        #
         #
         for r1 in range(len(robots)):
             for r2 in range(len(robots)):
@@ -284,7 +275,6 @@ class WAVNSim:
     # who can see this landmark index re
     # returns robot index ri
     def lookfor(self,re):
-        #print("Lookup lm=",re,end=" ")
         target=self.landmarks[re]
         done=[]
         numRob=len(self.robots)
@@ -303,19 +293,11 @@ class WAVNSim:
     #
     #
     #
-    # Function to allow an asynchonrous change in the map base on
-    # robot proximity, not very general as yet
+    # Function to allow an asynchonrous change in the map based on
+    # robot proximity, just a stub
     def checkForInterrupt(self,boti):
         robots,walls=self.robots,self.walls
         rp = robots[boti]
-        ip1=(30,28)
-        ip2=(24,14)
-        x,y=rp
-        x1,y1=ip2
-        if np.hypot(x-x1,y-y1)<10:
-            # make a change for the ip point
-            #walls[19][1]=27
-            walls[7][1]=9
         return 
 
     # Move one robot along its path, allow for loss of landmark visibility
@@ -326,7 +308,6 @@ class WAVNSim:
         #
         robots,landmarks,walls=self.robots,self.landmarks,self.walls
         blockprob=self.blockProb
-        #print(f"-Starting moving robot {boti} {path} ")
         cx,cy = robots[boti]
         segi=0
         wasBlocked=False
@@ -409,7 +390,6 @@ class WAVNSim:
     # check the list of targets and if any is None then
     # make a target and unit velocity [x,y,dx,dy]
     def resetTargets(self):
-        #print("Check for new robot targets.")
         targets,robots=self.targets,self.robots
         xrange=[0,self.worldX]
         yrange=[0,self.worldY]
@@ -422,7 +402,6 @@ class WAVNSim:
                 d = np.hypot(dx,dy)
                 if d>0:
                     dx,dy=dx/d,dy/d
-                #print("Robot "," new target ",(x,y,dx,dy))
                 targets[r]=[x,y,dx,dy]
         return
 
@@ -437,7 +416,6 @@ class WAVNSim:
     def moveSwarm(self,rs):
         if not self.gSwarmEnabled:
             return
-        #print("Moving the swarm")
         for r in range(len(self.robots)): #each robot
             if r==rs:
                 continue # done move the findpath robot
@@ -446,7 +424,7 @@ class WAVNSim:
             d=np.hypot(x-rx,y-ry)
             if d<1: # at target
                 self.targets[r]=None # signal for a new targetnext time
-                #print("Robot ",r," at target.")
+                #
                 continue
             nx,ny=rx+dx,ry+dy # new position
             if (nx<=5 or nx>=self.worldX-5) or (ny<=5 or ny>=self.worldY-5):
@@ -454,10 +432,9 @@ class WAVNSim:
             nx,ny=max(5,min(self.worldX-5,(nx))),max(5,min(self.worldY-5,(ny)))
             if geo.pointonanyline(self.walls,(nx,ny)):
                 self.targets[r]=None # resetting due to blockage
-                print("Robot ",r," blocked.")
+                print(f"moveSwarm; Robot {r} blocked.")
                 nx,ny=max(5,min(self.worldX-5,(rx-dx))),max(5,min(self.worldY-5,(ry-dy)))
-            self.robots[r]=((nx),(ny)) # new position of robot
-            #print("Robot ",r," move ",(rx,ry),"->",self.robots[r],"t:",self.targets[r])
+            self.robots[r]=((nx),(ny)) # new position of robot    
         return   
         
     #
@@ -476,7 +453,6 @@ class WAVNSim:
         ledgerR.append(start)
         r = start
         Found=True
-        #print("Ledger starts ",start)
         while Found: # try to chain all the robots through common
             Found=False
             for c in comm:
@@ -488,7 +464,6 @@ class WAVNSim:
                         
                         cl = random.choice( c[2] ) # list of common landmarks
                         cli = lmark.index(cl)
-                        #print("Ledger adds ",rn)
                         ledger.append( [rn,-cli] )
                         ledgerR.append(rn)
                         ledgerLM.append(cli)
@@ -528,7 +503,6 @@ class WAVNSim:
         ledger.append( [start,startlm] )
         r = start
         Found=True
-        #print("Ledger starts ",start)
         while Found: # try to chain all the robots through common
             Found=False
             for c in comm:
@@ -539,8 +513,6 @@ class WAVNSim:
                     if rn not in done:
                         # All the common landmarks between the two robots
                         clL = [lmark.index(cl)for cl in c[2]]
-                        #clL = [lmark.index(a) for a in self.cansee[rn]]
-                        #print("Ledger adds ",rn," with ",clL)
                         ledger.append( [rn,clL] )
                         ledgerR.append(rn)
                         ledgerLM.append(clL)
@@ -548,7 +520,6 @@ class WAVNSim:
                         done.append(r)
                         Found=True
                         break
-        #print("RLedger: len=",len(ledger)," of ",len(rlist))
         '''
         print("----RLEDGER----")
         for r in ledger:
@@ -567,74 +538,6 @@ class WAVNSim:
             print(self.ledgerR)
         return ledger
 
-    
-    # RRT implementation
-    # INCORRECT
-    def RRT(self,rs,li,lm,options=False):
-        ledger=self.ledger
-        ls=None
-        graph=[] # will contain the graph
-        #find the start
-        for l in ledger:
-            if l[0]==rs:
-                ls = ledger.index(l)
-                break
-        if ls is None:
-            print("RRT error, RS is not in the ledger! ",rs)
-            return None
-        graphnode=(ls,[],[]) # ledger, children, parent
-        graph.append( graphnode )
-        #loop making random samples
-        N_s=2000
-        doneFlag=False
-        for i in range(N_s):
-            # sample the ledger
-            s = random.randrange(0,len(ledger)-1)
-            if s == ls:
-                continue
-            print("Ns loop: s=",s)
-            # find any common landmarks with others
-            for g in graph:
-                print("test loop: g=",g)
-                lmg = ledger[g[0]][1]
-                lms = ledger[s][1]
-                print("   lists to check: ",lms, lmg)
-                found=False
-                if options:
-                    cm = [x for x in lms if x in lmg]
-                    found=len(cm)>0
-                else:
-                    found=lmg==lms
-                if found:
-                    graphnode=(s,[],graph.index(g)) # add parent
-                    graph.append(graphnode)
-                    g[1].append(len(graph)-1) # add to children
-                    doneFlag = ledger[s][0]==ri #done 
-                    break
-            if doneFlag:
-                break
-        # check if we found the goal
-        path=None # a sequence of [robot,landmarks]
-        if doneFlag:
-            # create a path from the graph
-            invpath=[]
-            gi=len(graph)-1 # goal entry
-            g = graph[gi]
-            lg = ledger[ g[0] ]
-            while lg[0] != rs:
-                if options:
-                    cm = lg[1]
-                else:
-                    cm = lg[1][0]
-                pnode = [ lg[0], cm ]
-                path.append(pnode)
-                gi = g[2] # parent
-                g = graph[gi]
-                lg = ledger[ g[0] ]
-            path=list(reversed(invpath))
-        return path
-            
-            
             
     # RSC Phase 1: find path from ledger
     # ledger entry l[0]=robot
@@ -765,7 +668,7 @@ class WAVNSim:
         common,cansee=self.common,self.cansee
         return dr.drawWorld(robots,landmarks,walls,common,cansee,self.map,clflag,rs,re)
     #END OF SIMULATION CLASS
-
+    #---------------------------------------------------------------------
 #
 # Some useful path manipulation functions
 #
@@ -787,13 +690,11 @@ def cpathLength(path,rlist,lmark):
     sum=0
     #print(path)
     for pi in range(0,len(path)-1):
-        l1,l2=path[pi],path[pi+1]
-        #print(" cpath1 ",l1,l2)    
+        l1,l2=path[pi],path[pi+1] 
         if isinstance(l1,list):
             l1 = l1[0]
         if isinstance(l2,list):
             l2 = l2[0]
-        #print(" cpath2 ",l1,l2)
             l1,l2=rlist[l1],lmark[abs(l2)]
         sum += np.hypot(l1[0]-l2[0], l1[1]-l2[1])
     return sum
@@ -807,7 +708,7 @@ def cpathRedundancy(path):
             options += float(len(p[1]))
         else:
             options += 1.0
-    
+    #
     return float(options)/float(len(path))
 
 
@@ -815,7 +716,6 @@ def cpathRedundancy(path):
 # translate BFS path to a sequence of coordinates
 # format of a no-chocie path =[p1,p2,...,pn], p=(lmark,robot) 
 def BFSpath2path(bp,rlist,lmark):
-    #print("\n BP: ",bp)
     path=[]
     for p in bp:
         if p[0] in ['S','G']: # special landmarks, just use the robot position
@@ -823,7 +723,6 @@ def BFSpath2path(bp,rlist,lmark):
         else:
             path.append( lmark[ abs(p[0]) ] ) # landmark may/maynot be negative
             # the landmark is negative just to make it easier to see in a list
-    #print("\n CP: ",path)
     return path
 
 # translate BFS robust path to a non robust sequence of coordinates
@@ -831,11 +730,8 @@ def BFSpath2path(bp,rlist,lmark):
 def RBFSpath2path(bp,rlist,lmark,options=False,coordFlag=True):
     path=[]
     sum=0
-    #print("RBFS \n",bp)
     for p in bp:
         if p[0] in ['S','G']: # special landmarks, just use the robot position
-            #path.append( rlist[ p[1] ]  )
-            #path.append( [p[1],p[1]]  )
             if coordFlag:
                 path.append( (rlist[ p[1] ][0],rlist[ p[1] ][1])  )
             else:
@@ -844,22 +740,18 @@ def RBFSpath2path(bp,rlist,lmark,options=False,coordFlag=True):
             ll=p[0] # landmark list, just pick the first
             sum += len(p[0])
             if not options:
-                #path.append( [p[1], (ll[0])]  ) # landmark may/maynot be negative
                 if coordFlag:
                     path.append( [rlist[p[1]],lmark[ abs(ll[0]) ]] ) # landmark may/maynot be negative
                 else:
                     path.append( [p[1],abs(ll[0])]  )
                 # the landmark is negative just to make it easier to see in a list
             else:
-                #seg = [ abs(i)  for i in ll ]
                 if coordFlag:
                     seg = [rlist[p[1]],[ lmark[ abs(i) ] for i in ll ]]
                 else:
                     seg = [p[1],[ abs(i)  for i in ll ]]
-                path.append(seg)# [p[1],seg])
+                path.append(seg))
     avbr=sum/(len(bp)-1)
-    #print("CRBFS \n",path)
-    #print("RBFS Path avBranch=",sum/(len(bp)-1))
     return path,avbr
 
 
