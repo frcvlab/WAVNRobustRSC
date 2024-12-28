@@ -750,7 +750,7 @@ def RBFSpath2path(bp,rlist,lmark,options=False,coordFlag=True):
                     seg = [rlist[p[1]],[ lmark[ abs(i) ] for i in ll ]]
                 else:
                     seg = [p[1],[ abs(i)  for i in ll ]]
-                path.append(seg))
+                path.append(seg)
     avbr=sum/(len(bp)-1)
     return path,avbr
 

@@ -115,18 +115,17 @@ def altMain1R():
 # This alt main runs a series of experiments to compare BFS and RCS phase 1 and 2
 # in terms of speed and path length
 
-def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
+def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,scaleEnd=10,appendFlag=False):
     wv.dr.Render=False
     rsptime1,rsptime2,bfstime1=[],[],[] # initialize lists for metrics
     rsplen1,rsplen2,bfslen1=[],[],[]
-    numScales=10
     numReps=100
     numK=5
     sigma=sigmaVal
     sigma2=sigma2Val
     rlRange =rlRangeVal
-    for scale in range(1,numScales):
-        print("Scale=",scale)
+    for scale in range(scaleStart,scaleEnd):
+        print(f"scale={scale} Ns={Ns} Nr={Nr}")
         rspt1,rspt2,bfst1=0.0,0.0,0.0 # initialize times
         rspl1,rspl2,bfsl1=0,0,0
         numPaths=0.0 # how many paths at this scale
@@ -164,7 +163,7 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
                     continue
                 #
                 stime2=tm.perf_counter()
-                rsppath2 = wavn.refinePathVH(rsppath1,options=wavn.gRobustPathEnabled,NS=25,NR=10)
+                rsppath2 = wavn.refinePathVH(rsppath1,options=wavn.gRobustPathEnabled,NS=Ns,NR=Nr)
                 etime2 = tm.perf_counter()-stime2
                 if rsppath2 is None:
                     continue
@@ -192,16 +191,19 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
         rsplen2.append( float(rspl2)/float(numPaths) )
         bfslen1.append( float(bfsl1)/float(numPaths) )
     # all experiments done, write results
-    casename="RSC-BFS-Comparisons-12-24" # the name of the LOGFILE to use
-    logfile = open("logfile"+casename+".csv","w") # APPEND!
+    casename="RSC-BFS-Comparisons-NrNs122724B" # the name of the LOGFILE to use
+    writeMode='w'
+    if appendFlag:
+        writeMode='a'
+    logfile = open("logfile"+casename+".csv",writeMode) 
     head="rlrange={},sigma2={}\n".format(rlRange,sigma2)
     logfile.write(head)
     print(head)
-    head="Scale,nR,nL,RCST1,RCST2,BFST1,RCSL1,RSPL2,BFSL\n"
+    head="Scale,nR,nL,RSCT1,RSCT2,BFST1,RSCL1,RSCL2,BFSL\n"
     logfile.write(head)
     print(head)
     print(len(rsptime1),len(rsptime2),len(bfstime1))
-    for ss in range(1,numScales):
+    for ss in range(0,scaleEnd-scaleEnd+1):
         s = ss-1
         line="{},{},{},{},{},{},{},{},{}\n".format(ss,sigma*ss,sigma*sigma2*ss,rsptime1[s],rsptime2[s],
                                                    bfstime1[s],rsplen1[s],rsplen2[s],bfslen1[s])
@@ -295,7 +297,7 @@ def altMain2R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
     head="rlrange={},sigma2={}\n".format(rlRange,sigma2)
     logfile.write(head)
     print(head)
-    head="Scale,nR,nL,RRCST1,RRCST2,RBFST1,RRCSL1,RRSPL2,RBFSL\n"
+    head="Scale,nR,nL,RRSCT1,RRSCT2,RBFST1,RRSCL1,RRSCL2,RBFSL\n"
     logfile.write(head)
     print(head)
     print(len(rsptime1),len(rsptime2),len(bfstime1))
@@ -312,28 +314,30 @@ def altMain2R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
 #
 def altMain3():
     rsptime1A,rsptime2A,bfstime1A,rsplen1A,rsplen2A,bfslen1A=[],[],[],[],[],[]
-    s1=5 # sigma
-    R1 = [25,100,500,1000] # sigma2
-    R2 = [5,10,50] # rlRange
+    R1 = range(0,42,2) # Ns
+    R2 = range(0,42,2) # Nr
     for N1 in R1:
         for N2 in R2:
             print(f'N1={N1}, N2={N2}..')
-            logfile,rsptime1,rsptime2,bfstime1,rsplen1,rsplen2,bfslen1=altMain2(Ns=N1,Nr=N2)
+            logfile,rsptime1,rsptime2,bfstime1,rsplen1,rsplen2,bfslen1=\
+                altMain2(Ns=N1,Nr=N2,scaleStart=4,scaleEnd=5,appendFlag=True) # just one scale
             rsptime1A.append( sum(rsptime1)/len(rsptime1) )
             rsptime2A.append( sum(rsptime2)/len(rsptime2) )
             bfstime1A.append( sum(bfstime1)/len(bfstime1) )
             rsplen1A.append( sum(rsplen1)/len(rsplen1) )
-            rsplen2A.append( sum(rsplen1)/len(rsplen1) )
+            rsplen2A.append( sum(rsplen2)/len(rsplen2) )
             bfslen1A.append( sum(bfslen1)/len(bfslen1) )
-    casename="Multi-RSC-BFS-Comparisons-12-17"
-    logfile = open("logfile"+casename+".csv","w") # APPEND!
-    head="S2,RL,RCST1A,RCST2A,BFST1A,RCSL1A,RSPL2A,BFSLA\n"
+    casename="RSC-Ns-Nr-Comaprison122724B"
+    logfile = open("logfile"+casename+".csv","w") 
+    #NOTE: Modify the altMain2() logfile name as well to agree with this one
+    # as both files are written in this experiment
+    head="NS,NR,RSCT1A,RSCT2A,BFST1A,RSCL1A,RSCL2A,BFSLA\n"
     logfile.write(head)
     print(head)
     i = 0
-    for s2 in R1: # sigma2 
-        for rl in R2: # rlRange
-            line="{},{},{},{},{},{},{},{},\n".format(s2,rl,rsptime1A[i],rsptime2A[i],bfstime1A[i],
+    for ns in R1:  
+        for nr in R2: 
+            line="{},{},{},{},{},{},{},{}\n".format(ns,nr,rsptime1A[i],rsptime2A[i],bfstime1A[i],
                                                      rsplen1A[i],rsplen2A[i],bfslen1A[i])
             logfile.write(line)
             print(line)
