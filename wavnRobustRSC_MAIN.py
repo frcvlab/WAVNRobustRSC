@@ -3,7 +3,9 @@
 # using the WAVN RobustRSC class
 # dml Dec 2024
 #
-import wavnRobustRSC as wv
+import wavnRobustRSC as wv # RSC and BFS code
+import WAVN_krrt as rrti   # RRT code
+
 import time as tm
 import numpy as np
 import math
@@ -11,6 +13,8 @@ import random
 #
 
 #-------------------------------------------------------------
+
+
 
 #this alt main just gives examples of RCS Phase 1 and 2 paths
 # for a fixed size world
@@ -44,6 +48,7 @@ def altMain1():
         cpath=wv.Ledgerpath2path(rsppath,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark1)
         wv.dr.showWorld(wavn.map)
+        print("path length ",len(cpath))
         ch=input()
         
         path = wavn.refinePathVH(rsppath,options=wavn.gRobustPathEnabled)
@@ -52,13 +57,26 @@ def altMain1():
         cpath=wv.Ledgerpath2path(path,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark2,offset=(2,2))
         wv.dr.showWorld(wavn.map)
+        print("path length ",len(cpath))
         ch=input()
         
         bfspath,bfslength,findsucceeded = wavn.bfsFindPath(rs,le)
         cpath=wv.BFSpath2path(bfspath,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark3,offset=(-2,-2))
         wv.dr.showWorld(wavn.map)
+        print("path length ",len(cpath))
         ch=input()
+
+        A=rrti.ledger2graph(ledger,numRobots,numLandmarks) # slow, but not being timed here
+        Qgoal=[r for r in cansee if landmarks[le] in cansee[r]]
+        path = rrti.rrtstar(Qgoal,rs,A,ledger)
+        if not path is None:
+            cpath=rrti.RRTpath2path(path,le,wavn.robots,wavn.landmarks)
+            last=landmarks[le] # will add in the last step
+            wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark4,offset=(1,-1))
+            wv.dr.showWorld(wavn.map)
+        ch=input()
+
     return
 
 #
@@ -112,22 +130,25 @@ def altMain1R():
     return
 
 #
-# This alt main runs a series of experiments to compare BFS and RCS phase 1 and 2
+# This alt main runs a series of experiments to compare BFS and RCS phase 1 and 2, and k-RRT*
 # in terms of speed and path length
 
 def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,scaleEnd=10,appendFlag=False):
     wv.dr.Render=False
-    rsptime1,rsptime2,bfstime1=[],[],[] # initialize lists for metrics
-    rsplen1,rsplen2,bfslen1=[],[],[]
+    rsptime1,rsptime2,bfstime1,rrttime1=[],[],[],[] # initialize lists for metrics
+    rsplen1,rsplen2,bfslen1,rrtlen1=[],[],[],[]
+    
     numReps=100
     numK=5
     sigma=sigmaVal
     sigma2=sigma2Val
     rlRange =rlRangeVal
+    print(f'altMain2: Scale start {scaleStart} end {scaleEnd}')
     for scale in range(scaleStart,scaleEnd):
         print(f"scale={scale} Ns={Ns} Nr={Nr}")
-        rspt1,rspt2,bfst1=0.0,0.0,0.0 # initialize times
-        rspl1,rspl2,bfsl1=0,0,0
+        rspt1,rspt2,bfst1,rrtt1=0.0,0.0,0.0,0.0 # initialize times
+        rspl1,rspl2,bfsl1,rrtl1=0,0,0,0
+        rspfails,bfsfails,rrtfails=0.0,0.0,0.0
         numPaths=0.0 # how many paths at this scale
         numRobots,numLandmarks=sigma*scale,sigma2*sigma*scale
         wavn=wv.WAVNSim()
@@ -147,6 +168,7 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
                 ledger = wavn.makeLedger()
                 if not ledger is None:
                     break
+            A=rrti.ledger2graph(ledger,numRobots,numLandmarks)
             i=0
             while i<numReps:
                 # Do one experiment
@@ -155,11 +177,11 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
                 rs, le,ri=wavn.choosetargets()
                 if rs is None: # no start robot => error in finding target
                     continue
-                #wavn.drawWorld(False,rs,re)
                 stime1=tm.perf_counter()
                 rsppath1 = wavn.findPath(rs,ri, le) # RSC path(startR,endR, endLmk)
                 etime1 = tm.perf_counter()-stime1
                 if rsppath1 is None:
+                    rspfails += 1.0
                     continue
                 #
                 stime2=tm.perf_counter()
@@ -172,26 +194,42 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
                 #cpath2=wv.BFSpath2path(bfspath,wavn.robots,wavn.landmarks)
                 etime3 = tm.perf_counter()-stime3
                 if not findsucceeded:
+                    bfsfails += 1.0
                     continue
+                
+                Qgoal=[r for r in cansee if landmarks[le] in cansee[r]]
+                stime4=tm.perf_counter()
+                rrtpath = rrti.rrtstar(Qgoal,rs,A,ledger)
+                #cpath=rrti.RRTpath2path(rrtpath,le,wavn.robots,wavn.landmarks)
+                etime4 = tm.perf_counter()-stime4
+                if rrtpath is None:
+                    rrtfails += 1.0
+                    continue
+
                 # have all paths at this point
                 numPaths+= 1
                 i += 1
                 rspt1 += etime1
                 rspt2 += etime1+etime2 # total time
                 bfst1 += etime3
+                rrtt1 += etime4
                 rspl1 += len(rsppath1) # wv.pathLength(rsppath1,landmarks)
                 rspl2 +=  len(rsppath2) #wv.pathLength(rsppath2,landmarks) 
-                bfsl1 +=  len(bfspath) #wv.pathLength(bfspath,landmarks) 
+                bfsl1 +=  len(bfspath) #wv.pathLength(bfspath,landmarks)
+                rrtl1 +=  len(rrtpath)+1 # add last landmark for consistency
         #end of this scale experiment k*numReps runs
         print("End of scale=",scale," #P=",numPaths," collecting stats.")
+        print("Fails%: ",rspfails/numPaths,bfsfails/numPaths,rrtfails/numPaths)
         rsptime1.append( float(rspt1)/float(numPaths) )
         rsptime2.append( float(rspt2)/float(numPaths) )
         bfstime1.append( float(bfst1)/float(numPaths) )
+        rrttime1.append( float(rrtt1)/float(numPaths) )
         rsplen1.append( float(rspl1)/float(numPaths) )
         rsplen2.append( float(rspl2)/float(numPaths) )
         bfslen1.append( float(bfsl1)/float(numPaths) )
+        rrtlen1.append( float(rrtl1)/float(numPaths) )
     # all experiments done, write results
-    casename="RSC-BFS-Comparisons-NrNs122724B" # the name of the LOGFILE to use
+    casename="RSC-BFS-RRT-Comparisons-NrNs122724B" # the name of the LOGFILE to use
     writeMode='w'
     if appendFlag:
         writeMode='a'
@@ -199,17 +237,18 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
     head="rlrange={},sigma2={}\n".format(rlRange,sigma2)
     logfile.write(head)
     print(head)
-    head="Scale,nR,nL,RSCT1,RSCT2,BFST1,RSCL1,RSCL2,BFSL\n"
+    head="Scale,nR,nL,RSCT1,RSCT2,BFST1,RRTT1,RSCL1,RSCL2,BFSL,RRTL\n"
     logfile.write(head)
     print(head)
     print(len(rsptime1),len(rsptime2),len(bfstime1))
-    for ss in range(0,scaleEnd-scaleEnd+1):
-        s = ss-1
-        line="{},{},{},{},{},{},{},{},{}\n".format(ss,sigma*ss,sigma*sigma2*ss,rsptime1[s],rsptime2[s],
-                                                   bfstime1[s],rsplen1[s],rsplen2[s],bfslen1[s])
+    for ss in range(0,scaleEnd-scaleStart):
+        s = ss
+        line="{},{},{},{},{},{},{},{},{},{},{}\n".format(ss,sigma*ss,sigma*sigma2*ss,rsptime1[s],rsptime2[s],
+                                                   bfstime1[s],rrttime1[s],rsplen1[s],rsplen2[s],
+                                                   bfslen1[s],rrtlen1[s])
         logfile.write(line)
         print(line)
-    return logfile,rsptime1,rsptime2,bfstime1,rsplen1,rsplen2,bfslen1
+    return logfile,rsptime1,rsptime2,bfstime1,rrttime1,rsplen1,rsplen2,bfslen1,rrtlen1
 
 
 #
@@ -516,15 +555,15 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
 #--------------MAIN-----------
 #
 
-print("Select: \n 1. Show examples of RSC/BFS\n 2. Compare RSC/BFS\n")
+print("Select: \n 1. Show examples of RSC/BFS/RRT\n 2. Compare RSC/BFS/RRT\n")
 print(          " 3. Run multi NrNs.\n 4. Show examples of RRCS/RBFS\n")
 print(          " 5. Compare RRSC/RBFS.\n 6. Run RRSC/RBFS runtime comparison.")
 ch = input("Enter your choice 1,2,3,4,5,6: ")
 
 if ch=="1":
-    altMain1() # show examples of RSC/BFS
+    altMain1() # show examples of RSC/BFS/RRT
 elif ch=="2":
-    altMain2() # run the RCS/BFS comparisons
+    altMain2() # run the RCS/BFS/RRT comparisons
 elif ch=="3":
     altMain3() # run the multirange RCS/BFS comparisons
 elif ch=="4":
@@ -533,6 +572,7 @@ elif ch=="5":
     altMain2R() # run the RCS/BFS comparisons
 elif ch=="6":
     altMain3R() # Run RRSC/RBFS runtime comparison
+
 else:
     print("Choices are 1,2,3,4,5,6 only.")
 #-----END-MAIN-----------------

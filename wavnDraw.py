@@ -20,7 +20,7 @@ lineMark = (0,150,150)
 pathMark1 = (120,50,150)
 pathMark2 = (50,120,220)
 pathMark3 = (120,150,50)
-pathMark4 = (150,150,150)
+pathMark4 = (150,10,10)
 wallMark = (150,150,0)
 
 #

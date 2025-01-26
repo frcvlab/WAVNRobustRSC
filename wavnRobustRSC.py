@@ -265,7 +265,10 @@ class WAVNSim:
         '''
         print("===========")
         for c in common:
-            print("C:",robots.index(c[0]),robots.index(c[1]),len(c[2]))
+            print("C:",robots.index(c[0]),robots.index(c[1]),end=":")
+            for l in c[2]:
+                print(landmarks.index(l),end=" ")
+            print()
         print("===========")
         '''
         self.common,self.cansee=common,cansee
@@ -448,11 +451,13 @@ class WAVNSim:
         ledger,ledgerR,ledgerLM=[],[],[]
         done=[]
         start=random.randrange(0,len(rlist)) # robot index in rlist
-    
-        ledger.append( [start,None] ) # firt block gets a free pass
+        startList=self.cansee[start]
+        cli=self.landmarks.index( startList[0] )
+        ledger.append( [start,None]) # -cli] )
         ledgerR.append(start)
         r = start
         Found=True
+        #print(f'Start is {start}')
         while Found: # try to chain all the robots through common
             Found=False
             for c in comm:
@@ -461,9 +466,10 @@ class WAVNSim:
                 if r in [r1,r2]:
                     rn=r2 if r1==start else r1
                     if rn not in done:
-                        
+                        #print(f'r {r} ; r1 {r1} r2 {r2} ')
                         cl = random.choice( c[2] ) # list of common landmarks
                         cli = lmark.index(cl)
+                        #print(f' common {cli}')
                         ledger.append( [rn,-cli] )
                         ledgerR.append(rn)
                         ledgerLM.append(cli)
@@ -501,8 +507,11 @@ class WAVNSim:
         start=random.randrange(0,len(rlist)) # robot index in rlist
         startlm = [self.landmarks.index(i) for i in self.cansee[start]]
         ledger.append( [start,startlm] )
+        ledgerR.append(start)
         r = start
         Found=True
+
+        #print(f'Start is {start}')
         while Found: # try to chain all the robots through common
             Found=False
             for c in comm:
@@ -512,7 +521,9 @@ class WAVNSim:
                     rn=r2 if r1==start else r1
                     if rn not in done:
                         # All the common landmarks between the two robots
+                        #print(f'r {r} ; r1 {r1} r2 {r2} ')
                         clL = [lmark.index(cl)for cl in c[2]]
+                        #print(f' common {clL}')
                         ledger.append( [rn,clL] )
                         ledgerR.append(rn)
                         ledgerLM.append(clL)
