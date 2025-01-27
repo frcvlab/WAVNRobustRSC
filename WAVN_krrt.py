@@ -1,7 +1,19 @@
 #
-# RRT* and interface to ledger
+# RRT* and interface to ledger/WAVN
 # dml Jan 2025
 #
+# Algorithm is from
+# S. Karaman and F. Frazzoli, “Sampling-based algorithms for optimal
+# motion planning,” vol. 30(7), 2011.
+#
+# Major changes
+# 1. Samples are drawn from the robot numbers in the ledger
+# 2. Distance between robots is the number of common landmark steps
+#    One common landmark step is when two robots share one or more
+#    common visual landmarks. This information is in the ledger.
+# 3. Alg. does not check for inObstacle between vertex and sample but
+#    checks equivalently for whether a common landmark exists for
+#    vertex and sample.
 
 import numpy as np
 import random as rand
