@@ -71,7 +71,8 @@ def altMain1():
         Qgoal=[r for r in cansee if landmarks[le] in cansee[r]]
         path = rrti.rrtstar(Qgoal,rs,A,ledger)
         if not path is None:
-            cpath=rrti.RRTpath2path(path,le,wavn.robots,wavn.landmarks)
+            path1=rrti.RRT2path(path,le,wavn.robots,wavn.landmarkswavn.commonDict)
+            cpath=wv.Ledgerpath2path(path1,wavn.robots,wavn.landmarks)
             last=landmarks[le] # will add in the last step
             wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark4,offset=(1,-1))
             wv.dr.showWorld(wavn.map)
@@ -123,7 +124,7 @@ def altMain1R():
         wv.dr.showWorld(wavn.map)
         ch=input()
         bfspath,bfslength,findsucceeded = wavn.bfsFindPath(rs,le)
-        cpath,avbr=wv.RBFSpath2path(bfspath,wavn.robots,wavn.landmarks,options=True)
+        cpath=wv.Ledgerpath2path(bfspath,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark3,offset=(-2,-2))
         wv.dr.showWorld(wavn.map)
         ch=input()
@@ -133,7 +134,7 @@ def altMain1R():
 # This alt main runs a series of experiments to compare BFS and RCS phase 1 and 2, and k-RRT*
 # in terms of speed and path length
 
-def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,scaleEnd=10,appendFlag=False):
+def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=30,Nr=20,scaleStart=1,scaleEnd=11,appendFlag=False):
     wv.dr.Render=False
     rsptime1,rsptime2,bfstime1,rrttime1=[],[],[],[] # initialize lists for metrics
     rsplen1,rsplen2,bfslen1,rrtlen1=[],[],[],[]
@@ -162,13 +163,14 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
         for k in range(0,numK):
             while True:
                 robots, landmarks, walls = wavn.makeWorld(numRobots, numLandmarks, 0)
-                #wavn.initTargets() # init swarm targets
                 common,cansee = wavn.findCommon()
-                wavn.makeGlobalSuccessors()
                 ledger = wavn.makeLedger()
                 if not ledger is None:
                     break
-            A=rrti.ledger2graph(ledger,numRobots,numLandmarks)
+            # Make the ledger info available for RRT
+            A,VM=rrti.ledger2graph(ledger,numRobots,numLandmarks)
+            # make it also available for BFS
+            wavn.makeGlobalSuccessors(A)
             i=0
             while i<numReps:
                 # Do one experiment
@@ -199,12 +201,12 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
                 
                 Qgoal=[r for r in cansee if landmarks[le] in cansee[r]]
                 stime4=tm.perf_counter()
-                rrtpath = rrti.rrtstar(Qgoal,rs,A,ledger)
-                #cpath=rrti.RRTpath2path(rrtpath,le,wavn.robots,wavn.landmarks)
+                rrtpath1 = rrti.rrtstar(Qgoal,rs,A,ledger)
                 etime4 = tm.perf_counter()-stime4
-                if rrtpath is None:
+                if rrtpath1 is None:
                     rrtfails += 1.0
                     continue
+                rrtpath=rrti.RRT2path(rrtpath1,le,wavn.robots,wavn.landmarks,wavn.commonDict)#,A,wavn.common,VM)
 
                 # have all paths at this point
                 numPaths+= 1
@@ -213,13 +215,18 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
                 rspt2 += etime1+etime2 # total time
                 bfst1 += etime3
                 rrtt1 += etime4
-                rspl1 += len(rsppath1) # wv.pathLength(rsppath1,landmarks)
-                rspl2 +=  len(rsppath2) #wv.pathLength(rsppath2,landmarks) 
-                bfsl1 +=  len(bfspath) #wv.pathLength(bfspath,landmarks)
-                rrtl1 +=  len(rrtpath)+1 # add last landmark for consistency
+                rspl1 += len(rsppath1) 
+                rspl2 +=  len(rsppath2)  
+                bfsl1 +=  len(bfspath) 
+                rrtl1 +=  len(rrtpath)
+                #print(bfspath)
+                #print(rsppath2)
+                #print(rrtpath)
+                #ch=input()
         #end of this scale experiment k*numReps runs
         print("End of scale=",scale," #P=",numPaths," collecting stats.")
-        print("Fails%: ",rspfails/numPaths,bfsfails/numPaths,rrtfails/numPaths)
+        print("Fails%: ",rspfails/(numPaths+rspfails),bfsfails/(numPaths+bfsfails),
+              rrtfails/(numPaths+rrtfails))
         rsptime1.append( float(rspt1)/float(numPaths) )
         rsptime2.append( float(rspt2)/float(numPaths) )
         bfstime1.append( float(bfst1)/float(numPaths) )
@@ -229,7 +236,7 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
         bfslen1.append( float(bfsl1)/float(numPaths) )
         rrtlen1.append( float(rrtl1)/float(numPaths) )
     # all experiments done, write results
-    casename="RSC-BFS-RRT-Comparisons-NrNs122724B" # the name of the LOGFILE to use
+    casename="RSC-BFS-RRT-Test012725" # the name of the LOGFILE to use
     writeMode='w'
     if appendFlag:
         writeMode='a'
@@ -242,10 +249,9 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,scaleStart=1,sca
     print(head)
     print(len(rsptime1),len(rsptime2),len(bfstime1))
     for ss in range(0,scaleEnd-scaleStart):
-        s = ss
-        line="{},{},{},{},{},{},{},{},{},{},{}\n".format(ss,sigma*ss,sigma*sigma2*ss,rsptime1[s],rsptime2[s],
-                                                   bfstime1[s],rrttime1[s],rsplen1[s],rsplen2[s],
-                                                   bfslen1[s],rrtlen1[s])
+        line="{},{},{},{},{},{},{},{},{},{},{}\n".format(ss+1,sigma*ss,sigma*sigma2*ss,rsptime1[ss],rsptime2[ss],
+                                                   bfstime1[ss],rrttime1[ss],rsplen1[ss],rsplen2[ss],
+                                                   bfslen1[ss],rrtlen1[ss])
         logfile.write(line)
         print(line)
     return logfile,rsptime1,rsptime2,bfstime1,rrttime1,rsplen1,rsplen2,bfslen1,rrtlen1

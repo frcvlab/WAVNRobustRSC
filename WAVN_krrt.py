@@ -50,8 +50,8 @@ def ledger2graph(ledger,N,M): # returns AdjMat,VisibMat
 # n is number of trials
 # return is graph of vertices (robot numbers) and edges (robot,robot)
 #
-def rrt(Qgoal,start,A,ledger,n=300):
-    # Qgoal //region that identifies success
+def rrt(Qgoal,start,A,ledger,n=300,findFirst=false):
+    # Qgoal //region that identifies success its an OR list
     counter = 0 #keeps track of iterations
     V,E=[],[] # Graph G
     V.append(start)
@@ -65,14 +65,18 @@ def rrt(Qgoal,start,A,ledger,n=300):
             link=(xNearest,xNew)
             V.append(xNew)
             E.append(link)
-            if xNew in Qgoal:
+            if findFirst and xNew in Qgoal:
                 path = extractPath(E,start,xNew)
                 return path
         counter += 1
+    # all samples complete, find a path if one exists
+    for g in Qgoal:
+        if g in V:
+            return extractPath(E,start,g)
     return None
 
 # k-RRT* for WAVN
-# Qgoal is a set of final robots that could see the goal
+# Qgoal is an OR set of final robots that could see the goal
 # start is the robot to move
 # A is the visibility by common landmark adjacency matrix
 # ledger is the ledger
@@ -84,7 +88,7 @@ def rrt(Qgoal,start,A,ledger,n=300):
 # r1 to move to a  common landmark seen by r1 and r2, then to one see
 # by r2 and r3 etc.
 #
-def rrtstar(Qgoal,start,A,ledger,n=1000,k=100):
+def rrtstar(Qgoal,start,A,ledger,n=1000,k=100,findFirst=False):
     i = 0 #keeps track of iterations
     V,E=[],[] # Graph G, edges=(v1,v2,cost)
     V.append(start)
@@ -95,7 +99,7 @@ def rrtstar(Qgoal,start,A,ledger,n=1000,k=100):
         
         if len(E)==0 and A[start][xNew]==1: # first one gets a pass
             E.append( (start,xNew,1) ) # cost is one
-            if xNew in Qgoal:
+            if findFirst and xNew in Qgoal:
                 path = extractPath(E,start,xNew)
                 return path
             continue
@@ -128,9 +132,14 @@ def rrtstar(Qgoal,start,A,ledger,n=1000,k=100):
                 E = removeEdge(e,E)
                 E.append( (xNew,xNear,cost(xNew,E)+A[xNew][xNear]) )
 
-        if xNew in Qgoal: # success
+        if findFirst and xNew in Qgoal: # success
             path = extractPath(E,start,xNew)
             return path
+        # all samples complete, find a path if one exists
+        
+        for g in Qgoal:
+            if g in V:
+                return extractPath(E,start,g)
     return None
 
 
@@ -167,13 +176,15 @@ def extractPath(E,rs,rg):
     r = rg
     while r!=rs:
         link=[]
+        #Tree structure, just follow path
+        # from leaf back to root
         for l in E:
-            if l[1]==r:
+            if l[1]==r :
                 link=l
-                break
+                break # there will be at most one
         if link==[]:
-            print("RRT: Extract path - no path exists!")
-            exit()
+            #print("RRT: Extract path - no path exists!")
+            return None
         path.append( (link[0],link[1]) )
         r = link[0]
     path.reverse()
