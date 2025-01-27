@@ -12,26 +12,24 @@ import random as rand
 # make an adjacency matrix for the equivalend robot-to-robot
 # common landmark visibility adjacency matrix
 #
-def ledger2graph(ledger,N,M): # returns AdjMat
+def ledger2graph(ledger,N,M): # returns AdjMat,VisibMat
     VisibMat=np.zeros( (N,M) )
     AdjMat=np.zeros((N,N))
     # First make a NxM robot to landmark binary visibility matrix
     # VisibMat[r][l]==1 if robot r can see landmark l
     prev_lmarks=None
+    prev_robot=None
     for entry in ledger:
         robot,lmarks=entry
         vmr = VisibMat[robot]
+        vmr1 = VisibMat[prev_robot]
         if isinstance(lmarks,list):
             for lm in lmarks:
-                vmr[lm]=1
-            if not prev_lmarks is None:
-                for lm in prev_lmarks:
-                    vmr[lm]=1
+                vmr[lm],vmr1[lm]=1,1
         elif not lmarks is None:
-            vmr[-lmarks]=1
-            if not prev_lmarks is None:
-                vmr[-prev_lmarks]=1
+            vmr[-lmarks],vmr1[-lmarks]=1,1
         prev_lmarks=lmarks
+        prev_robot = robot
         
     # next, make the robot-robot adjacency matrix
     for i in range(N): # each robot
@@ -42,7 +40,7 @@ def ledger2graph(ledger,N,M): # returns AdjMat
                     AdjMat[i][k],AdjMat[k][i]=1,1 # symmetric
     for i in range(N):
         AdjMat[i][i]=0 # for convenience
-    return AdjMat
+    return AdjMat,VisibMat
 
 # RRT for WAVN
 # Qgoal is a set of final robots that could see the goal
@@ -86,7 +84,7 @@ def rrt(Qgoal,start,A,ledger,n=300):
 # r1 to move to a  common landmark seen by r1 and r2, then to one see
 # by r2 and r3 etc.
 #
-def rrtstar(Qgoal,start,A,ledger,n=500,k=10):
+def rrtstar(Qgoal,start,A,ledger,n=1000,k=100):
     i = 0 #keeps track of iterations
     V,E=[],[] # Graph G, edges=(v1,v2,cost)
     V.append(start)
@@ -94,14 +92,14 @@ def rrtstar(Qgoal,start,A,ledger,n=500,k=10):
 
     for i in range(n):
         xNew = samplefree(ledger,V)
-
-        if len(E)==0: # first one gets a pass
+        
+        if len(E)==0 and A[start][xNew]==1: # first one gets a pass
             E.append( (start,xNew,1) ) # cost is one
             if xNew in Qgoal:
                 path = extractPath(E,start,xNew)
                 return path
             continue
-
+        
         xNearest = nearest(xNew,V,E,A)
 
         # don't need to check for inObstacle, but we instead check for
@@ -146,6 +144,7 @@ def samplefree(ledger,V):
     while True:
         xIndex = rand.randrange(0,L)
         xNew = ledger[xIndex][0] # robot index from ledger
+        break
         if not xNew in V:
             break
     return xNew
@@ -231,16 +230,19 @@ def removeEdge(e,E):
 # Translate an RRT path to the standard form that
 # the other methods use for drawing
 # last landmark needs to be added, since RRT just does Robot to Robot
-# common landmark steps.
+# common landmark steps
 # le is the last landmark, and robots,landmarks are the robot
 # and landmark position lists from WAVN
 #
-def RRTpath2path(rrtpath,le,robots,landmarks):
-    path = []
+def RRT2path(rrtpath,le,robots,landmarks,commonDict):#,A,common,VM):
+    path=[]
+    nextr=rrtpath[0][0]
     for link in rrtpath:
-        path.append(robots[link[0]])
-        path.append(robots[link[1]])
-    path.append(landmarks[le])
+        cl = commonDict[nextr][link[1]]
+        lmi=landmarks.index(cl[0])
+        path.append( (nextr,-lmi) )
+        nextr = link[1]
+    path.append( (nextr,-le))
     return path
     
 #EOF

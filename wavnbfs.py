@@ -47,7 +47,7 @@ def search(fringe, goalFunc, successorFunc):
         if done:
             lastPlan = rootnode[2]
             pathLength=rootnode[1]+1
-            lastPlan.append((dest,bot))
+            lastPlan.append((-dest,bot))
             return lastPlan,pathLength,True # final action and distance
         
         succList = successorFunc(bot,searched) # a list of states)

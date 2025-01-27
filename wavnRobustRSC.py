@@ -38,6 +38,7 @@ class WAVNSim:
         # variables for common landmarks
         self.common=None
         self.cansee=None
+        self.commonDict={}
         # variables for things in the world
         self.robots, self.landmarks, self.walls =None,None,None
         # target list for all moving robots (not the robot doing a path)
@@ -63,12 +64,14 @@ class WAVNSim:
         self.debug=False
         #
         # variables for BFS callbacks
-        self.gSuccDict = {} #successor dictionary for BFS
+        self.gSucc = {} #successor dictionary for BFS
         self.gGoalMark,self.gGoalBot=None,None
         #
         self.ledger=[] # the ledger [ [robotindex,clindex-with-prev-robot],.....]
         self.ledgerR=[]
         self.ledgerLM=[]
+        self.A=None # adj matrix from ledger
+        self.VM=None # vm matrix from ledger
         #
         self.ppDebug=False # debug statements in path planning
         self.expDebug=False # tracing in the experimental run sequence
@@ -83,25 +86,24 @@ class WAVNSim:
     # FUNCTIONS to interface to BFS
     #       
     #
-    # make the successor dictionary as a global
-    def makeGlobalSuccessors(self):
+    # make the successor dictionary as a global, filtered by ledger adjacency A
+    def makeGlobalSuccessors(self,A):
         common,robots,landmarks=self.common,self.robots,self.landmarks
-        self.gSuccDict={}
-        for c in common:
-            r1 = robots.index( c[0] ) # mapp position to robot index
-            r2 = robots.index( c[1] )
-            lmlist = c[2]
-            for lm in lmlist: # get all landmarks
-                lmi = landmarks.index(lm)
-                #print(lm,lmi)
-                if not r1 in self.gSuccDict:
-                    self.gSuccDict[ r1 ] = [ (r2,-lmi ) ]
-                elif not r2 in self.gSuccDict[ r1 ]:
-                    self.gSuccDict[ r1 ].append( (r2,-lmi ))
-        #for r in robots:
-        #    ri = robots.index(r)
-        #    if ri in self.gSuccDict:
-        #        print(ri,len(self.gSuccDict[ri]))
+        self.A = A # remember this
+        #
+        n,_=self.A.shape
+        for i in range(n):
+            for j in range(n):
+                for lm in self.commonDict[i][j]:
+                    lmi = landmarks.index(lm)
+                    if not i in self.gSucc:
+                        self.gSucc[i]=[(j,-lmi)]
+                    else:
+                        self.gSucc[i].append((j,-lmi))
+                    if not j in self.gSucc:
+                        self.gSucc[j]=[(i,-lmi)]
+                    else:
+                        self.gSucc[j].append((i,-lmi))
         return
 
     # useful function to print out common list for bot
@@ -121,10 +123,10 @@ class WAVNSim:
     # successor function for BFS, uses global gSuccDict
     # call using lambda
     def successorFunc(self,bot,searched):
-        if not bot in self.gSuccDict:
+        if not bot in self.gSucc:
             return []
         else:
-            return self.gSuccDict[bot]
+            return self.gSucc[bot]
         return []
 
     # envelop function for BFS search
@@ -135,10 +137,21 @@ class WAVNSim:
         initnode=[ initstate,0,[["S",rs]] ]
         fringe = [ initnode ]
         if self.gRobustPathEnabled:
-            path,length,succeeded = robust_s.search(fringe, self.goalFunc, self.successorFunc)
+            bfspath,length,succeeded = robust_s.search(fringe, self.goalFunc, self.successorFunc)
         else:
-            path,length,succeeded = s.search(fringe, self.goalFunc, self.successorFunc)
-        return path,length,succeeded
+            bfspath,length,succeeded = s.search(fringe, self.goalFunc, self.successorFunc)
+        # BFS path format [('S',r1),(r2,-lm1),.... lm1 is common landmark for r1,r2
+        # put the path in the general format [(robot1,-lm1),(robot2,-lm2)...]
+        # where robot1,robot2 have common landmark l1, etc. final lm is the target.
+        path=[]
+        r1=bfspath[0][1] # first robot
+        for p in bfspath[1:]: # skip first = ('S',r)
+            path.append( (r1,p[0]) )
+            # include this to have the path be checked
+            #if r1!=p[1] and not self.landmarks[-p[0]] in self.commonDict[r1][p[1]]:
+            #    print("BFS path error ",r1,p[1],self.commonDict[r1][p[1]],p[0])
+            r1 = p[1]
+        return path,len(path),succeeded
         
     # MAKE,READ,WRITE world functions
     #
@@ -220,13 +233,18 @@ class WAVNSim:
     # determine which landmarks can be seen by each robot
     # - that is the dictionary can see
     # and which landmarks can be seen in common by robots
-    # - that is the list common
+    # - that is the list common, also commonDict for convenience
     # format of common landmark list
-    # [ [r1,r2,[l1,l2,..]], [r1,r3,[l1,l2,...]], ... ]
+    #    [ [r1,r2,[l1,l2,..]], [r1,r3,[l1,l2,...]], ... ]
+    # format of commonDict
+    #    commonDict[r1][r2]=[l1,l2,...]
+    # These are all redundant forms for convenience
+    #
     def findCommon(self,extRange=-1):
         #
         common=[]
         cansee={} # one robot list
+        commonDict={} # dictionary version of common
         robots,landmarks,walls=self.robots,self.landmarks,self.walls
         # each robot
         sum=0
@@ -251,15 +269,17 @@ class WAVNSim:
         #
         #
         for r1 in range(len(robots)):
+            commonDict[r1]={}
             for r2 in range(len(robots)):
+                cl=[]
                 if (r1!=r2):
-                    cl=[]
                     for l1 in cansee[r1]:
                         if l1 in cansee[r2]:
                             cl.append(l1)
                     if len(cl)>0:
                         entry=(robots[r1],robots[r2],cl)
                         common.append(entry)
+                commonDict[r1][r2]=cl
         #
         #
         '''
@@ -271,7 +291,7 @@ class WAVNSim:
             print()
         print("===========")
         '''
-        self.common,self.cansee=common,cansee
+        self.common,self.cansee,self.commonDict=common,cansee,commonDict
         return common,cansee
 
     #
@@ -463,6 +483,8 @@ class WAVNSim:
             for c in comm:
                 r1 = rlist.index( c[0] )
                 r2 = rlist.index( c[1] )
+                if len(c[2])==0:
+                    print("Common landmark error! empty CL list")
                 if r in [r1,r2]:
                     rn=r2 if r1==start else r1
                     if rn not in done:
@@ -553,6 +575,12 @@ class WAVNSim:
     # RSC Phase 1: find path from ledger
     # ledger entry l[0]=robot
     #
+    # Common path format
+    # path = [ (r1,-lm1),(r2,-lm2),...]
+    # robots r1,r2,... landmarks lm1,lm2,...
+    # lm are negative just to make them easier to see when inspecting the list
+    # meaning: r1,r2 have common landmark lm1, r2 and r3 have common landmark lm2 etc.
+    # the final lm is the target of the path
     
     def findPath(self,rs,ri, lm):
         ls,le=None,None
@@ -587,12 +615,18 @@ class WAVNSim:
         if lli!=ri:
             print("Error: findPath; did not end on end robot: ",ledger[li][0],ri)
             return None
-        path.append( [lli,lm])  # last element
+        path.append( [lli,-lm])  # last element
         return path
 
 
     # RSC Phase 2: refine path    
     #
+    # Common path format
+    # path = [ (r1,-lm1),(r2,-lm2),...]
+    # robots r1,r2,... landmarks lm1,lm2,...
+    # lm are negative just to make them easier to see when inspecting the list
+    # meaning: r1,r2 have common landmark lm1, r2 and r3 have common landmark lm2 etc.
+    # the final lm is the target of the path
     def refinePathVH(self,path,options=False,NS=25,NR=5):
         #
         if path is None:
@@ -608,7 +642,7 @@ class WAVNSim:
             lcp=len(cpath)
             if lcp<=1: # can't do better than this
                 break
-            pi = random.randrange(0,lcp-1) 
+            pi = random.randrange(0,lcp)#lcp-1) 
             lmi = cpath[pi][1]
             if options and isinstance(lmi,list):
                 pj = random.randrange(0,len(lmi)) # random option path
@@ -683,6 +717,12 @@ class WAVNSim:
 #
 # Some useful path manipulation functions
 #
+# Common path format
+# path = [ (r1,-lm1),(r2,-lm2),...]
+# robots r1,r2,... landmarks lm1,lm2,...
+# lm are negative just to make them easier to see when inspecting the list
+# meaning: r1,r2 have common landmark lm1, r2 and r3 have common landmark lm2 etc.
+# the final lm is the target of the path
         
 # how long in units is the path, where path=seq landmarks
 def pathLength(path,lmarks):
@@ -724,7 +764,7 @@ def cpathRedundancy(path):
 
 
       
-# translate BFS path to a sequence of coordinates
+# translate native BFS path to a sequence of coordinates
 # format of a no-chocie path =[p1,p2,...,pn], p=(lmark,robot) 
 def BFSpath2path(bp,rlist,lmark):
     path=[]
@@ -767,7 +807,8 @@ def RBFSpath2path(bp,rlist,lmark,options=False,coordFlag=True):
 
 
 
-# translate Ledger path to a sequence of coordinates
+# translate Ledger (ie common path format )path to a sequence of coordinates
+#
 def Ledgerpath2path(bp,rlist,lmark,coordFlag=True):
     if bp is None:
         return None
