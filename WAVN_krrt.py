@@ -188,12 +188,15 @@ def extractPath(E,rs,rg):
     r = rg
     while r!=rs:
         link=[]
-        #Tree structure, just follow path
+        #Tree structure => just follow path
         # from leaf back to root
         for l in E:
-            if l[1]==r :
+            # this MIN only needed for leaf node rg
+            # because this is a tree
+            mincost=10000 # big number
+            if l[1]==r  and l[2]<mincost:
+                mincost=l[2]
                 link=l
-                break # there will be at most one
         if link==[]:
             #print("RRT: Extract path - no path exists!")
             return None
