@@ -62,7 +62,7 @@ def ledger2graph(ledger,N,M): # returns AdjMat,VisibMat
 # n is number of trials
 # return is graph of vertices (robot numbers) and edges (robot,robot)
 #
-def rrt(Qgoal,start,A,ledger,n=300,findFirst=false):
+def rrt(Qgoal,start,A,ledger,n=300,findFirst=False):
     # Qgoal //region that identifies success its an OR list
     counter = 0 #keeps track of iterations
     V,E=[],[] # Graph G
@@ -190,13 +190,15 @@ def extractPath(E,rs,rg):
         link=[]
         #Tree structure => just follow path
         # from leaf back to root
+        mincost=10000 # big number
         for l in E:
             # this MIN only needed for leaf node rg
             # because this is a tree
-            mincost=10000 # big number
+            #
             if l[1]==r  and l[2]<mincost:
                 mincost=l[2]
                 link=l
+            
         if link==[]:
             #print("RRT: Extract path - no path exists!")
             return None

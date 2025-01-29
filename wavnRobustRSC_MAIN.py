@@ -235,6 +235,7 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=30,Nr=20,scaleStart=1,sca
         rsplen2.append( float(rspl2)/float(numPaths) )
         bfslen1.append( float(bfsl1)/float(numPaths) )
         rrtlen1.append( float(rrtl1)/float(numPaths) )
+        print("Lengths: ",rsplen2[-1],bfslen1[-1],rrtlen1[-1])
     # all experiments done, write results
     casename="RSC-BFS-RRT-Test012725" # the name of the LOGFILE to use
     writeMode='w'
