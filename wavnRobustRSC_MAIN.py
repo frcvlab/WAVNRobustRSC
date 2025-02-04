@@ -34,11 +34,16 @@ def altMain1():
     robots, landmarks, walls = wavn.makeWorld(numRobots, numLandmarks, 0)
     #wavn.initTargets() # init swarm targets
     common,cansee = wavn.findCommon()
-    wavn.makeGlobalSuccessors()
     ledger = wavn.makeLedger()
+    # Make the ledger info available for RRT
+    A,VM=rrti.ledger2graph(ledger,numRobots,numLandmarks)
+    # make it also available for BFS
+    wavn.makeGlobalSuccessors(A)
+
     wavn.drawWorld(False)
-    print("Will show a bunch of examples.\n")
-    print("RSC Phase 1 First, then press Enter Phase2, then again for BFS")
+    print("Will 100  examples.\n")
+    print("RSC Phase 1 First, then press Enter Phase2, then again for BFS and then RRT*")
+    print("Just ^C when you see enough")
     for i in range(100): # show a bunch (100) of examples
         rs, le,ri=wavn.choosetargets()
         wavn.drawWorld(False,rs,le)
@@ -48,7 +53,7 @@ def altMain1():
         cpath=wv.Ledgerpath2path(rsppath,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark1)
         wv.dr.showWorld(wavn.map)
-        print("path length ",len(cpath))
+        print("path length ",len(cpath)," enter to continue ")
         ch=input()
         
         path = wavn.refinePathVH(rsppath,options=wavn.gRobustPathEnabled)
@@ -57,25 +62,26 @@ def altMain1():
         cpath=wv.Ledgerpath2path(path,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark2,offset=(2,2))
         wv.dr.showWorld(wavn.map)
-        print("path length ",len(cpath))
+        print("path length ",len(cpath)," enter to continue ")
         ch=input()
         
         bfspath,bfslength,findsucceeded = wavn.bfsFindPath(rs,le)
         cpath=wv.BFSpath2path(bfspath,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark3,offset=(-2,-2))
         wv.dr.showWorld(wavn.map)
-        print("path length ",len(cpath))
+        print("path length ",len(cpath)," enter to continue ")
         ch=input()
-
-        A=rrti.ledger2graph(ledger,numRobots,numLandmarks) # slow, but not being timed here
+        
+        
         Qgoal=[r for r in cansee if landmarks[le] in cansee[r]]
         path = rrti.rrtstar(Qgoal,rs,A,ledger)
         if not path is None:
-            path1=rrti.RRT2path(path,le,wavn.robots,wavn.landmarkswavn.commonDict)
+            path1=rrti.RRT2path(path,le,wavn.robots,wavn.landmarks,wavn.commonDict)
             cpath=wv.Ledgerpath2path(path1,wavn.robots,wavn.landmarks)
             last=landmarks[le] # will add in the last step
             wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark4,offset=(1,-1))
             wv.dr.showWorld(wavn.map)
+        print("path length ",len(cpath)," enter to continue ")
         ch=input()
 
     return
@@ -99,12 +105,14 @@ def altMain1R():
     robots, landmarks, walls = wavn.makeWorld(numRobots, numLandmarks, 0)
     #wavn.initTargets() # init swarm targets
     common,cansee = wavn.findCommon()
-    wavn.makeGlobalSuccessors()
     ledger = wavn.makeRLedger()
+    A,VM=rrti.ledger2graph(ledger,numRobots,numLandmarks)
+    wavn.makeGlobalSuccessors(A)
     wavn.gBlocked=None # reverse any blockages
     wavn.drawWorld(False)
-    print("Will show a bunch of examples.\n")
-    print("RSC Phase 1 First, then press Enter Phase2, then again for BFS")
+    print("Will show 100 robust examples.\n")
+    print("RRSC Phase 1 First, then press Enter Phase2, then again for RBFS")
+    print("Just use ^C when you have seen enough")
 
     for i in range(100):
         rs, le,ri=wavn.choosetargets()
@@ -115,18 +123,21 @@ def altMain1R():
         cpath=wv.Ledgerpath2path(rsppath,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark1)
         wv.dr.showWorld(wavn.map)
-        wv.ch=input()
+        print("Enter to continue")
+        ch=input()
         path = wavn.refinePathVH(rsppath,options=wavn.gRobustPathEnabled,NS=200) # auto robust
         if path is None:
             continue
         cpath=wv.Ledgerpath2path(path,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark2,offset=(2,2))
         wv.dr.showWorld(wavn.map)
+        print("Enter to continue")
         ch=input()
         bfspath,bfslength,findsucceeded = wavn.bfsFindPath(rs,le)
         cpath=wv.Ledgerpath2path(bfspath,wavn.robots,wavn.landmarks)
         wv.dr.drawPath(cpath,wavn.landmarks,wavn.map,mark=wv.dr.pathMark3,offset=(-2,-2))
         wv.dr.showWorld(wavn.map)
+        print("Enter to continue")
         ch=input()
     return
 
@@ -145,6 +156,7 @@ def altMain2(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=30,Nr=20,scaleStart=1,sca
     sigma2=sigma2Val
     rlRange =rlRangeVal
     print(f'altMain2: Scale start {scaleStart} end {scaleEnd}')
+    print("Ignore the graphics window, its not used here")
     for scale in range(scaleStart,scaleEnd):
         print(f"scale={scale} Ns={Ns} Nr={Nr}")
         rspt1,rspt2,bfst1,rrtt1=0.0,0.0,0.0,0.0 # initialize times
@@ -291,10 +303,11 @@ def altMain2R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10):
             while True:
                 robots, landmarks, walls = wavn.makeWorld(numRobots, numLandmarks, 0)
                 common,cansee = wavn.findCommon()
-                wavn.makeGlobalSuccessors()
                 ledger = wavn.makeRLedger()
                 if not ledger is None:
                     break
+            A,VM=rrti.ledger2graph(ledger,numRobots,numLandmarks)
+            wavn.makeGlobalSuccessors(A)
             #
             i=0
             while i<numReps:
@@ -365,7 +378,7 @@ def altMain3():
     for N1 in R1:
         for N2 in R2:
             print(f'N1={N1}, N2={N2}..')
-            logfile,rsptime1,rsptime2,bfstime1,rsplen1,rsplen2,bfslen1=\
+            logfile,rsptime1,rsptime2,bfstime1,rrttime1,rsplen1,rsplen2,bfslen1,rrtlen1=\
                 altMain2(Ns=N1,Nr=N2,scaleStart=4,scaleEnd=5,appendFlag=True) # just one scale
             rsptime1A.append( sum(rsptime1)/len(rsptime1) )
             rsptime2A.append( sum(rsptime2)/len(rsptime2) )
@@ -442,10 +455,11 @@ def altMain3R(sigmaVal=10,sigma2Val=10,rlRangeVal=50,Ns=25,Nr=10,appendFlag=Fals
         while True:
             robots, landmarks, walls = wavn.makeWorld(numRobots, numLandmarks, 0)
             common,cansee = wavn.findCommon()
-            wavn.makeGlobalSuccessors()
             ledger = wavn.makeRLedger()
             if not ledger is None:
-                break
+                   break
+        A,VM=rrti.ledger2graph(ledger,numRobots,numLandmarks)
+        wavn.makeGlobalSuccessors(A)
 
         timeSteps=0
         findpathsucceeded=False

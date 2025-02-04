@@ -33,6 +33,8 @@ def ledger2graph(ledger,N,M): # returns AdjMat,VisibMat
     prev_robot=None
     for entry in ledger:
         robot,lmarks=entry
+        if prev_robot is None:
+            prev_robot=robot # fix
         vmr = VisibMat[robot]
         vmr1 = VisibMat[prev_robot]
         if isinstance(lmarks,list):

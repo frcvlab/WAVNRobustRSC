@@ -665,7 +665,8 @@ class WAVNSim:
                         a = self.cansee[ri]
                         b = [lmark[x] for x in cpath[pi][1]] 
                         newCL = [lmark.index(x) for x in a if x in b ]
-                        newpath[npi+1]=[ri,newCL] #lmi
+                        indx=min(len(newpath)-1,npi+1)
+                        newpath[indx]=[ri,newCL] #lmi
                         if len(newCL)==0:
                             print(f"Robot {ri}  can also see landmark {lmi} at {lm}")
                             print("Cansee? ",lm in self.cansee[ri],self.cansee[ri])
